@@ -1,0 +1,19 @@
+{
+  "name": "multi-tenant-proxy",
+  "version": "1.0.0",
+  "description": "A basic multi-tenant proxy with JWT authorization",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "dev": "node --watch main.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.21.0",
+    "njwt": "^2.0.0",
+    "pem-jwk": "^2.0.0"
+  }
+}
