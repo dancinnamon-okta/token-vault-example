@@ -1,6 +1,7 @@
 'use strict'
 
 const axios = require('axios')
+const vault = require('../lib/token_vault')
 
 /**
  * Connects proxy routes to the Express app.
@@ -13,20 +14,66 @@ module.exports.connect = function (app, tenantMiddleware, authMiddleware) {
         const tenantConfig = req.tenantConfig
         const proxyPath = req.params[0] // Everything after /, defaulting to empty string.
         const targetUrl = `${tenantConfig.backend_url}/${proxyPath}`
+        console.log(req.params)
         console.log("Proxy path is:")
         console.log(proxyPath)
         console.log(`[${tenantConfig.id}] Proxying ${req.method} request to: ${targetUrl}`)
 
+        //First, if there is a valid vault connection set up on the tenantConfig, let's attempt to get the external token from Vault.
+        let vaultedToken = ''
+
+        if(tenantConfig.vault_connection) {
+            console.log("Vault was configured for this tenant- getting a new token using inbound token:")
+            console.log(req.authContext.accessToken)
+            const vaultedTokenResponse = await vault.exchangeOktaAccessToken(process.env.AUTH0_DOMAIN, req.authContext.accessToken, process.env.AUTH0_CTE_CLIENT_ID, process.env.AUTH0_CTE_CLIENT_SECRET, process.env.AUTH0_VAULT_CLIENT_ID, process.env.AUTH0_VAULT_CLIENT_SECRET, process.env.AUTH0_VAULT_AUDIENCE, process.env.AUTH0_VAULT_SCOPE, tenantConfig.vault_connection)
+            console.log(vaultedTokenResponse)
+            if(vaultedTokenResponse.success) {
+                vaultedToken = vaultedTokenResponse.accessToken
+            }
+            else if(vaultedTokenResponse.needsLinking) { //We failed due to lack of credentials
+                console.log("Account linking is required. Beginning the account linking flow.")
+
+                const connectedAccountResponse = await vault.beginConnectedAccountFlow(process.env.AUTH0_DOMAIN, req.authContext.accessToken, process.env.AUTH0_CTE_CLIENT_ID, process.env.AUTH0_CTE_CLIENT_SECRET, tenantConfig.vault_connection, `${process.env.PROXY_BASE_URL}/callback`, tenantConfig.external_scopes)
+                if(connectedAccountResponse.success) {
+                    //In a real implementation, you'd want to persist the authSession and associate it with the user's session.
+                    return res.status(401).json({
+                        error: 'Account Linking Required',
+                        message: 'A connected account linking is required to obtain tokens for the backend service.',
+                        connectUrl: connectedAccountResponse.connectUrl,
+                        authSession: connectedAccountResponse.authSession
+                    })
+                }
+                else {
+                    return res.status(403).json({
+                        error: 'Token Request Failed',
+                        message: 'Unable to obtain proper tokens.'
+                    })
+                }
+            }
+            else { //We straight up failed.
+                return res.status(403).json({
+                    error: 'Token Request Failed',
+                    message: 'Unable to obtain proper tokens.'
+                })
+            }
+        }
+
         try {
-            // Forward the request to the backend
-            const backendResponse = await axios({
-                method: req.method,
-                url: targetUrl,
-                headers: {
+            // Forward the request to the backend. Including a vaulted token if vaulting was configured for the given tenant.
+            let backendHeaders = {
                     // Forward select headers, excluding host and whatever authorization was sent on the original request inbound.
                     'Content-Type': req.headers['content-type'] || 'application/json',
                     'Accept': req.headers['accept'] || 'application/json'
-                },
+            
+            }
+            if(vaultedToken) {
+                backendHeaders['Authorization'] = `Bearer ${vaultedToken}`
+            }
+
+            const backendResponse = await axios({
+                method: req.method,
+                url: targetUrl,
+                headers: backendHeaders,
                 data: ['POST', 'PUT', 'PATCH'].includes(req.method) ? req.body : undefined,
                 params: req.query,
                 timeout: 30000,

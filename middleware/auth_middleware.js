@@ -22,8 +22,13 @@ module.exports.authMiddleware = async function(req, res, next) {
   )
 
   if (!authResult.success) {
+    const resourceMetadataUrl = `${process.env.PROXY_BASE_URL}/.well-known/oauth-protected-resource/${req.tenantConfig.id}/${req.params[0]}`
+    const wwwAuthValue = `Bearer error="invalid_or_misssing_jwt", error_description="${authResult.message}", resource_metadata="${resourceMetadataUrl}"`
+    
+    res.set('WWW-Authenticate', wwwAuthValue)
     return res.status(authResult.statusCode).json({
       error: authResult.statusCode === 401 ? 'Unauthorized' : 'Forbidden',
+
       message: authResult.message
     })
   }
