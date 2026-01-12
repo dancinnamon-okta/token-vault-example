@@ -7,6 +7,7 @@ const vault = require('../lib/token_vault')
  * Connects proxy routes to the Express app.
  * All requests to /:tenantId/proxy/* are forwarded to the tenant's backend URL.
  */
+//TODO: There's a potential that we might not use a vaulted connection at all. Test this!
 module.exports.connect = function (app, tenantMiddleware, authMiddleware) {
 
     // Catch-all proxy route

@@ -30,6 +30,8 @@ module.exports.connect = function (app) {
                 client_secret_expires_at: 0,
                 
                 // Array of redirect URIs
+                //TODO: This is VSCODE specific. Need to handle other public clients.
+                //TODO: Parse inbound request, and determine what public client we have.
                 redirect_uris: [
                     "http://127.0.0.1:33418",
                     "https://vscode.dev/redirect"

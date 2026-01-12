@@ -20,7 +20,8 @@ module.exports.authMiddleware = async function(req, res, next) {
     req.method,
     req.headers
   )
-
+  console.log("Auth result")
+  console.log(authResult)
   if (!authResult.success) {
     const resourceMetadataUrl = `${process.env.PROXY_BASE_URL}/.well-known/oauth-protected-resource/${req.tenantConfig.id}/${req.params[0]}`
     const wwwAuthValue = `Bearer error="invalid_or_misssing_jwt", error_description="${authResult.message}", resource_metadata="${resourceMetadataUrl}"`
@@ -37,6 +38,7 @@ module.exports.authMiddleware = async function(req, res, next) {
   req.authContext = {
     accessToken: authResult.token
   }
-
+  
+  console.log(req.authContext)
   next()
 }

@@ -35,7 +35,7 @@ module.exports.connect = function (app) {
                 authorization_endpoint: `${process.env.PROXY_BASE_URL}/authorize/${tenantId}`, //`${tenant.issuer}/v1/authorize`,
                 
                 // REQUIRED: URL of the token endpoint
-                token_endpoint: `${process.env.PROXY_BASE_URL}/token/${tenantId}`,
+                token_endpoint: `${process.env.PROXY_BASE_URL}/token`,
                 
                 // OPTIONAL: URL of the JWK Set document
                 jwks_uri: tenant.keys_endpoint,
@@ -44,7 +44,10 @@ module.exports.connect = function (app) {
                 registration_endpoint: `${process.env.PROXY_BASE_URL}/register`,
                 
                 // RECOMMENDED: JSON array of scopes supported
-                //scopes_supported: tenant.external_scopes || [],
+                //TODO: Change this back to tenant.external_scopes after initial testing is done.
+                //TODO: I'm not sure about the offline_access bit here. Do we really need this?
+                //Note- some MCP clients, like VSCode- need an id_token to function properly. Having openid and profile does that.
+                scopes_supported: ['openid', 'profile', 'gist', 'notifications', 'offline_access', 'project', 'public_repo', 'read:gpg_key', 'read:org', 'repo', 'repo:status', 'repo_deployment', 'user', 'user:email', 'user:follow'], //tenant.external_scopes || [],
                 
                 // REQUIRED: JSON array of response types supported
                 response_types_supported: ['code'],
@@ -53,15 +56,16 @@ module.exports.connect = function (app) {
                 response_modes_supported: ['query'],
                 
                 // OPTIONAL: JSON array of grant types supported
-                grant_types_supported: ['authorization_code', 'refresh_token'],
+                grant_types_supported: ['authorization_code'],
                 
                 // OPTIONAL: JSON array of client authentication methods supported
-                token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
+                token_endpoint_auth_methods_supported: ['none', 'client_secret_basic', 'client_secret_post'],
                 
                 // OPTIONAL: JSON array of PKCE code challenge methods supported
                 code_challenge_methods_supported: ['S256'],
                 
                 // OPTIONAL: URL of the protected resource metadata endpoint (RFC 9728)
+                //TODO: this isn't quite right. I'm hardcoding my /mcp endpoint in there. Update this!
                 protected_resources: [`${process.env.PROXY_BASE_URL}/.well-known/oauth-protected-resource/${tenantId}/mcp`]
             }
             

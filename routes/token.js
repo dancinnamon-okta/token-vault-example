@@ -18,6 +18,8 @@ const returningAuthzCache = require('../lib/return_authz_cache')
  * @param {string} codeChallengeMethod - The method used (plain or S256)
  * @returns {boolean} - True if the verifier is valid, false otherwise
  */
+
+//TODO: The PKCE validation isn't working right now- need to fix it.
 function validatePKCE(codeVerifier, codeChallenge, codeChallengeMethod) {
     if (!codeVerifier || !codeChallenge) {
         return false
@@ -142,13 +144,24 @@ module.exports.connect = function (app) {
 
         // Return the access token
         const accessToken = cachedAuthz.accessToken
+        const idToken = cachedAuthz.idToken
 
         console.log(`Token endpoint: Successfully exchanged authorization code for access token for tenant ${cachedAuthz.tenantId}`)
 
+        res.header('Cache-Control', 'no-store');
+
         //TODO: May need to return more things like scope, expires, etc.
-        return res.status(200).json({
+        //TODO: I'm currently not returning back the proper expires_in value. Need to fix that.
+        const response ={
             access_token: accessToken,
+            id_token: idToken,
+            scope: 'openid profile gist notifications offline_access project public_repo read:gpg_key read:org repo repo:status repo_deployment user user:email user:follow',
+            expires_in: 3600,
             token_type: 'Bearer'
-        })
+        }
+        console.log ("Token response:")
+        console.log (response)
+        
+        return res.status(200).json(response)
     })
 }

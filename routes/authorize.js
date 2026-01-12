@@ -4,6 +4,7 @@ const crypto = require('crypto')
 const tenantConfig = require('../lib/tenant_config')
 const outboundRequestCache = require('../lib/outbound_request_cache')
 
+//TODO: Basic updates to code comments.
 /**
  * OAuth 2.0 Authorize Endpoint Proxy
  * 
@@ -53,7 +54,7 @@ module.exports.connect = function (app) {
             proxyQueryParams.set("client_id", process.env.VSCODE_CLIENT)
             proxyQueryParams.set("redirect_uri", `${process.env.PROXY_BASE_URL}/callback`)
             proxyQueryParams.set("response_type", "code")
-            proxyQueryParams.set("scope", "openid")
+            proxyQueryParams.set("scope", "openid profile")
             proxyQueryParams.set("state", outboundState)
             proxyQueryParams.set("nonce", outboundNonce)
             //proxyQueryParams.set("code_challenge", inboundAuthParameters.get("code_challenge"))

@@ -1,0 +1,11 @@
+[
+  {
+    "id": "github",
+    "name": "Github via AI Relay",
+    "backend_url": "https://api.githubcopilot.com",
+    "issuer": "https://your-okta-domain.okta.com/oauth2/authz_server_id",
+    "keys_endpoint": "https://your-okta-domain.okta.com/oauth2/authz_server_id/v1/keys",
+    "vault_connection": "github",
+    "external_scopes": ["refresh_token", "gist", "notifications", "public_repo", "repo", "repo:status", "repo_deployment", "user", "user:email", "user:follow", "read:gpg_key", "read:org", "project"]
+  }
+]

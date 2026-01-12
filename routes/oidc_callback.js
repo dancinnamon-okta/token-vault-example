@@ -6,6 +6,7 @@ const tenantConfig = require('../lib/tenant_config')
 const vault = require('../lib/token_vault')
 const returningAuthzCache = require("../lib/return_authz_cache")
 
+//TODO: Mainly just updating comments and documentation.
 /**
  * OAuth 2.0 Callback Endpoint
  * 
@@ -77,9 +78,10 @@ module.exports.connect = function (app) {
 
         // Exchange the authorization code for tokens
         //All we want is openid here- we're just doing a normal login- we haven't touched final resources yet.
+        //TODO: When logging in, we're always just using openid and profile. is this fine?
         const tokenEndpoint = `${process.env.OKTA_DOMAIN}/oauth2/v1/token`
         const redirectUri = parameters.get("redirect_uri")
-        const scope = 'openid'
+        const scope = 'openid profile'
         const tenant = tenantConfig.getTenantConfig(tenantId)
         try {
 
@@ -100,7 +102,7 @@ module.exports.connect = function (app) {
                 outboundRequestCache.clearCachedOutboundRequest(state)
                 console.log("Cached credentials already exist. Connected accounts flow is not necessary. Returning details back to the originating redirect_uri.")
                 const newAuthzCode = crypto.randomBytes(32).toString('base64url')
-                returningAuthzCache.addToCache(newAuthzCode, agentAccessToken, originalState, tenantId, originalParameters)
+                returningAuthzCache.addToCache(newAuthzCode, agentAccessToken, idToken, originalState, tenantId, originalParameters)
                 const finalRedirectUrl = `${originalParameters.get("redirect_uri")}?code=${newAuthzCode}&state=${originalState}`
                 res.redirect (finalRedirectUrl) //Redirect back to the original client with authz and original state.
             }

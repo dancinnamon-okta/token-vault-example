@@ -78,7 +78,7 @@ module.exports.connect = function (app) {
                 connect_code: connect_code,
                 redirect_uri: redirectUri
             }
-
+            //TODO: This really should be in a library like the rest of my endpoints do when they post to Okta or Auth0.
             console.log('Completing Connected Accounts request:')
             console.log(requestBody)
             console.log(cachedData)
@@ -93,6 +93,8 @@ module.exports.connect = function (app) {
             console.log(response.data)
 
             // Now that we're done with the account linking- return back to the original client and give them an authz code they can exchange for tokens.
+            //TODO: I haven't added in the ID_TOKEN to the response yet. I need to do this!
+            //TODO: Maybe i look at the scopes, and only return the ID token if openid scope was requested?
             console.log("Returning details back to the originating redirect_uri.")
 
             const oidcCachedData = outboundRequestCache.getCachedOutboundRequest(oidcState)
