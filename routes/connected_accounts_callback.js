@@ -3,7 +3,7 @@
 const crypto = require('crypto')
 const axios = require('axios')
 const sessionCache = require('../lib/connected_account_session_cache')
-const outboundRequestCache = require('../lib/outbound_request_cache')
+const oidcRequestCache = require('../lib/oidc_cache')
 const returningAuthzCache = require("../lib/return_authz_cache")
 
 /**
@@ -93,16 +93,15 @@ module.exports.connect = function (app) {
             console.log(response.data)
 
             // Now that we're done with the account linking- return back to the original client and give them an authz code they can exchange for tokens.
-            //TODO: I haven't added in the ID_TOKEN to the response yet. I need to do this!
-            //TODO: Maybe i look at the scopes, and only return the ID token if openid scope was requested?
+            //TODO: I'm always returning ID Token right now. Should i?
             console.log("Returning details back to the originating redirect_uri.")
 
-            const oidcCachedData = outboundRequestCache.getCachedOutboundRequest(oidcState)
-            outboundRequestCache.clearCachedOutboundRequest(oidcState)
+            const oidcCachedData = oidcRequestCache.getOidcRequest(oidcState)
+            oidcRequestCache.clearOidcRequest(oidcState)
             console.log(oidcCachedData)
 
             const newAuthzCode = crypto.randomBytes(32).toString('base64url')
-            returningAuthzCache.addToCache(newAuthzCode, oidcCachedData.accessToken, oidcCachedData.originalState, oidcCachedData.tenantId, oidcCachedData.originalParameters)
+            returningAuthzCache.addToCache(newAuthzCode, oidcCachedData.accessToken, oidcCachedData.accessTokenScope , oidcCachedData.accessTokenExpiresIn, oidcCachedData.idToken, oidcCachedData.originalState, oidcCachedData.tenantId, oidcCachedData.originalParameters)
             const finalRedirectUrl = `${oidcCachedData.originalParameters.get("redirect_uri")}?code=${newAuthzCode}&state=${oidcCachedData.originalState}`
 
             res.redirect (finalRedirectUrl) //Redirect back to the original client with authz and original state.

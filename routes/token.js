@@ -124,14 +124,15 @@ module.exports.connect = function (app) {
                 error_description: 'No code_challenge was found in the original authorization request.'
             })
         }
-/*
-        if (!validatePKCE(code_verifier, codeChallenge, codeChallengeMethod)) {
-            return res.status(400).json({
-                error: 'invalid_grant',
-                error_description: 'The code_verifier does not match the code_challenge.'
-            })
-        }
-*/
+        //TODO: I'm not currently validating PKCE!
+        /*
+                if (!validatePKCE(code_verifier, codeChallenge, codeChallengeMethod)) {
+                    return res.status(400).json({
+                        error: 'invalid_grant',
+                        error_description: 'The code_verifier does not match the code_challenge.'
+                    })
+                }
+        */
         // Validate client_id matches the original request
         let originalClientId = originalParameters.get('client_id')
     
@@ -150,13 +151,11 @@ module.exports.connect = function (app) {
 
         res.header('Cache-Control', 'no-store');
 
-        //TODO: May need to return more things like scope, expires, etc.
-        //TODO: I'm currently not returning back the proper expires_in value. Need to fix that.
-        const response ={
+        const response = {
             access_token: accessToken,
             id_token: idToken,
-            scope: 'openid profile gist notifications offline_access project public_repo read:gpg_key read:org repo repo:status repo_deployment user user:email user:follow',
-            expires_in: 3600,
+            scope: cachedAuthz.scope,
+            expires_in: cachedAuthz.expires,
             token_type: 'Bearer'
         }
         console.log ("Token response:")

@@ -1,6 +1,6 @@
 'use strict'
 const crypto = require('crypto')
-const outboundRequestCache = require('../lib/outbound_request_cache')
+const oidcRequestCache = require('../lib/oidc_cache')
 const oktaAuth0Exchange = require('../lib/okta_auth0_exchange')
 const tenantConfig = require('../lib/tenant_config')
 const vault = require('../lib/token_vault')
@@ -64,7 +64,7 @@ module.exports.connect = function (app) {
         }
 
         // Retrieve the cached outbound request using the state value
-        const cachedRequest = outboundRequestCache.getCachedOutboundRequest(state)
+        const cachedRequest = oidcRequestCache.getOidcRequest(state)
 
         if (!cachedRequest) {
             return res.status(400).json({
@@ -78,10 +78,9 @@ module.exports.connect = function (app) {
 
         // Exchange the authorization code for tokens
         //All we want is openid here- we're just doing a normal login- we haven't touched final resources yet.
-        //TODO: When logging in, we're always just using openid and profile. is this fine?
         const tokenEndpoint = `${process.env.OKTA_DOMAIN}/oauth2/v1/token`
         const redirectUri = parameters.get("redirect_uri")
-        const scope = 'openid profile'
+        const scope = 'openid profile' //Always just using openid/profile for the initial login. It's not what the agent is getting.
         const tenant = tenantConfig.getTenantConfig(tenantId)
         try {
 
@@ -91,7 +90,11 @@ module.exports.connect = function (app) {
             const idJag = await oktaAuth0Exchange.getIdJagFromOkta(tokenEndpoint, tenant, idToken, process.env.AGENT_CLIENT_ID, process.env.AGENT_PRIVATE_KEY_PATH, process.env.AGENT_PRIVATE_KEY_ID)
 
             console.log("ID JAG Obtained- getting agent access token specific to this managed connection/tenant...")
-            const agentAccessToken = await oktaAuth0Exchange.getAccessTokenFromIDJag(tenant, idJag, process.env.AGENT_CLIENT_ID, process.env.AGENT_PRIVATE_KEY_PATH, process.env.AGENT_PRIVATE_KEY_ID)
+            const agentAccessTokenResponse = await oktaAuth0Exchange.getAccessTokenFromIDJag(tenant, idJag, process.env.AGENT_CLIENT_ID, process.env.AGENT_PRIVATE_KEY_PATH, process.env.AGENT_PRIVATE_KEY_ID)
+
+            const agentAccessToken = agentAccessTokenResponse.accessToken
+            const agentAccessTokenScope = agentAccessTokenResponse.scope
+            const agentAccessTokenExpires = agentAccessTokenResponse.expires_in
 
             console.log("Obtained final agent access token. Attempting to get end user tokens from vault...")
             const vaultedTokenResponse = await vault.exchangeOktaAccessToken(process.env.AUTH0_DOMAIN, agentAccessToken, process.env.AUTH0_CTE_CLIENT_ID, process.env.AUTH0_CTE_CLIENT_SECRET, process.env.AUTH0_VAULT_CLIENT_ID, process.env.AUTH0_VAULT_CLIENT_SECRET, process.env.AUTH0_VAULT_AUDIENCE, process.env.AUTH0_VAULT_SCOPE, tenant.vault_connection)
@@ -99,10 +102,10 @@ module.exports.connect = function (app) {
 
             if (vaultedTokenResponse.success) {
                 //I think in this case, we just need to generate an authorization code, and return a response back to hte actual redirect URL. The authorization code would be a cache key for the agent access token.
-                outboundRequestCache.clearCachedOutboundRequest(state)
+                oidcRequestCache.clearOidcRequest(state)
                 console.log("Cached credentials already exist. Connected accounts flow is not necessary. Returning details back to the originating redirect_uri.")
                 const newAuthzCode = crypto.randomBytes(32).toString('base64url')
-                returningAuthzCache.addToCache(newAuthzCode, agentAccessToken, idToken, originalState, tenantId, originalParameters)
+                returningAuthzCache.addToCache(newAuthzCode, agentAccessToken, agentAccessTokenScope, agentAccessTokenExpires, idToken, originalState, tenantId, originalParameters)
                 const finalRedirectUrl = `${originalParameters.get("redirect_uri")}?code=${newAuthzCode}&state=${originalState}`
                 res.redirect (finalRedirectUrl) //Redirect back to the original client with authz and original state.
             }
@@ -113,7 +116,7 @@ module.exports.connect = function (app) {
                 
                 if(connectedAccountResponse.success) {
                     //Update our OIDC cache with the access token. When we're done connecting the account we need to stuff it in the authz code cache.
-                    outboundRequestCache.cacheOutboundRequest(state, parameters, originalState, originalParameters, agentAccessToken, tenantId)
+                    oidcRequestCache.cacheOidcRequest(state, parameters, originalState, originalParameters, agentAccessToken, agentAccessTokenScope, agentAccessTokenExpires, tenantId)
                     res.redirect(connectedAccountResponse.connectUrl)
                 }
                 else {
@@ -134,7 +137,7 @@ module.exports.connect = function (app) {
             console.error('Error exchanging authorization code for tokens:', error.response?.data || error.message)
 
             // Clear the cached outbound request even on failure to prevent reuse in case something fails very early on.
-            outboundRequestCache.clearCachedOutboundRequest(state)
+            oidcRequestCache.clearOidcRequest(state)
 
             if (error.response) {
                 const errorData = error.response.data

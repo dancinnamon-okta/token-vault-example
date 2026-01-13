@@ -50,7 +50,8 @@ module.exports.connect = function (app) {
                 client_name: `VSCode Proxy Client`,
                 
                 // Scopes the client is allowed to request
-                scope: []//(tenant.external_scopes || []).join(' ')
+                //TODO: Do I need this?
+                scope: []
             }
 
             res.status(201).json(clientMetadata)

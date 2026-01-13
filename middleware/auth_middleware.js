@@ -17,7 +17,6 @@ module.exports.authMiddleware = async function(req, res, next) {
 
   const authResult = await jwtAuthorizer.authorizeRequest(
     tenantConfig,
-    req.method,
     req.headers
   )
   console.log("Auth result")

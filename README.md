@@ -1,29 +1,23 @@
-# Multi-Tenant Proxy with JWT Authorization
+# Okta AI Token Vault Proxy (Multi-Tenant)
 
-A basic multi-tenant proxy server with JWT-based authorization, inspired by the secured-fhir-proxy pattern.
+## WARNING: Early release not intended for production use!
 
 ## Overview
 
-This project demonstrates a multi-tenant proxy architecture where:
-- Each tenant has its own configuration (backend URL, OAuth issuer, supported scopes)
-- Requests are authenticated using JWT bearer tokens
-- Tokens are validated against the tenant's configured JWKS endpoint
-- Authorized requests are proxied to the tenant's backend service
+This project is a reference proxy that integrates with the Okta AI Token Vault to securely broker access from AI agents to protected APIs without exposing or managing downstream credentials in the agent. It provides:
 
-## Project Structure
+- Multi-tenant/resource configuration: per-tenant issuer/JWKS, backend URL, and vault connection details
+- Inbound authentication: validates the agent’s JWT (issuer + JWKS) and enforces scopes
+- Outbound credential brokering: retrieves or acquires downstream API credentials via the Token Vault, then decorates the proxied request (for example, attaches a downstream access token)
+- Least-privilege scope enforcement based on HTTP method (read/write)
+- Simple proxying to the configured backend service for each tenant
 
-```
-├── main.js                    # Express server entry point
-├── tenants.json               # Tenant configurations
-├── lib/
-│   ├── tenant_config.js       # Tenant configuration loader
-│   └── jwt_authorizer.js      # JWT validation and authorization
-├── middleware/
-│   └── auth_middleware.js     # Express middleware for auth
-└── routes/
-    ├── info_routes.js         # Health check and tenant info endpoints
-    └── proxy_routes.js        # Proxy route handlers
-```
+High-level flow:
+1. Client/agent sends a request with a bearer token to this proxy.
+2. Proxy validates the token (issuer, signature via JWKS, expiration) and checks scopes.
+3. Proxy looks up tenant/resource config and requests downstream credentials from the Token Vault (using the configured connection).
+4. If consent/connection is required, the proxy surfaces an authorization error indicating the connected-accounts flow is needed.
+5. On success, the proxy forwards the request to the backend service with the appropriate downstream Authorization header.
 
 ## Installation
 
@@ -35,26 +29,11 @@ npm install
 
 ### Tenant Configuration
 
-Edit `tenants.json` to configure your tenants:
-
-```json
-[
-  {
-    "id": "tenant-a",
-    "name": "Tenant A",
-    "backend_url": "https://api.example.com",
-    "issuer": "https://your-okta-domain.okta.com/oauth2/default",
-    "keys_endpoint": "https://your-okta-domain.okta.com/oauth2/default/v1/keys",
-    "scopes_supported": ["openid", "profile", "api:read", "api:write"]
-  }
-]
-```
+Copy `tenants.example.json` to `tenants.json` configure your tenants.
 
 ### Environment Variables
 
-- `PORT` - Server port (default: 3000)
-- `API_BASE_URL` - Base URL for audience validation (optional)
-- `CONFIG_PATH` - Path to configuration files (optional)
+Copy `.env.example` to `.env` to configure global settings.
 
 ## Running the Server
 
@@ -84,52 +63,10 @@ npm run dev
 
 ## Usage Examples
 
-### Check Health
-
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3000/github/mcp
 ```
-
-### List Tenants
-
-```bash
-curl http://localhost:3000/tenants
-```
-
-### Make Authenticated Proxy Request
-
-```bash
-curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-     http://localhost:3000/tenant-a/proxy/users/1
-```
-
-## JWT Requirements
-
-Access tokens must:
-1. Be issued by the tenant's configured `issuer`
-2. Be signed with a key available at the tenant's `keys_endpoint`
-3. Contain appropriate scopes (`api:read` for GET, `api:write` for POST/PUT/DELETE)
-4. Not be expired
-
-## Scope Validation
-
-The proxy validates scopes based on HTTP method:
-- `GET`, `HEAD`, `OPTIONS` - Requires a scope containing "read" or `api:read`
-- `POST`, `PUT`, `PATCH`, `DELETE` - Requires a scope containing "write" or `api:write`
-
-## Extending the Proxy
-
-### Adding Custom Authorization Logic
-
-Modify `lib/jwt_authorizer.js` to add custom authorization rules.
-
-### Adding New Routes
-
-Create a new file in `routes/` and connect it in `main.js`.
-
-### Adding Fine-Grained Access Control
-
-Extend `middleware/auth_middleware.js` to add resource-level authorization.
+This example is found in tenants.example.json, and the proxy would forward to: https://api.githubcopilot.com/mcp
 
 ## License
 

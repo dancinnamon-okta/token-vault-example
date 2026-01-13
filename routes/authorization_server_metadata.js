@@ -12,9 +12,10 @@ const tenantConfig = require('../lib/tenant_config')
 module.exports.connect = function (app) {
 
     // RFC 8414 Authorization Server Metadata endpoint
-    app.get('/.well-known/oauth-authorization-server/:tenantId/mcp', async (req, res) => {
+    app.get('/.well-known/oauth-authorization-server/:tenantId/*', async (req, res) => {
         const tenantId = req.params.tenantId
-        
+        const proxyPath = req.params[0]
+
         try {
             const tenant = tenantConfig.getTenantConfig(tenantId)
             
@@ -32,7 +33,7 @@ module.exports.connect = function (app) {
                 
                 // REQUIRED: URL of the authorization endpoint
                 //This will actually point to our internal proxy.
-                authorization_endpoint: `${process.env.PROXY_BASE_URL}/authorize/${tenantId}`, //`${tenant.issuer}/v1/authorize`,
+                authorization_endpoint: `${process.env.PROXY_BASE_URL}/authorize/${tenantId}`,
                 
                 // REQUIRED: URL of the token endpoint
                 token_endpoint: `${process.env.PROXY_BASE_URL}/token`,
@@ -44,10 +45,7 @@ module.exports.connect = function (app) {
                 registration_endpoint: `${process.env.PROXY_BASE_URL}/register`,
                 
                 // RECOMMENDED: JSON array of scopes supported
-                //TODO: Change this back to tenant.external_scopes after initial testing is done.
-                //TODO: I'm not sure about the offline_access bit here. Do we really need this?
-                //Note- some MCP clients, like VSCode- need an id_token to function properly. Having openid and profile does that.
-                scopes_supported: ['openid', 'profile', 'gist', 'notifications', 'offline_access', 'project', 'public_repo', 'read:gpg_key', 'read:org', 'repo', 'repo:status', 'repo_deployment', 'user', 'user:email', 'user:follow'], //tenant.external_scopes || [],
+                scopes_supported: tenant.external_scopes,
                 
                 // REQUIRED: JSON array of response types supported
                 response_types_supported: ['code'],
@@ -65,8 +63,7 @@ module.exports.connect = function (app) {
                 code_challenge_methods_supported: ['S256'],
                 
                 // OPTIONAL: URL of the protected resource metadata endpoint (RFC 9728)
-                //TODO: this isn't quite right. I'm hardcoding my /mcp endpoint in there. Update this!
-                protected_resources: [`${process.env.PROXY_BASE_URL}/.well-known/oauth-protected-resource/${tenantId}/mcp`]
+                protected_resources: [`${process.env.PROXY_BASE_URL}/.well-known/oauth-protected-resource/${tenantId}/${proxyPath}`]
             }
             
             return res.status(200).json(metadata)

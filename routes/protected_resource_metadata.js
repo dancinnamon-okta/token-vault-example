@@ -13,9 +13,10 @@ const tenantConfig = require('../lib/tenant_config')
 module.exports.connect = function (app) {
 
     // RFC 9728 Protected Resource Metadata endpoint
-    app.get('/.well-known/oauth-protected-resource/:tenantId/mcp', async (req, res) => {
+    app.get('/.well-known/oauth-protected-resource/:tenantId/*', async (req, res) => {
         const tenantId = req.params.tenantId
-        
+        const proxyPath = req.params[0]
+
         try {
             const tenant = tenantConfig.getTenantConfig(tenantId)
             
@@ -29,16 +30,13 @@ module.exports.connect = function (app) {
             // Build the protected resource metadata response per RFC 9728
             const metadata = {
                 // REQUIRED: The protected resource's resource identifier
-                resource: `${process.env.PROXY_BASE_URL}/${tenantId}/mcp`,
+                resource: `${process.env.PROXY_BASE_URL}/${tenantId}/${proxyPath}`,
                 
                 // Passing back ourselves as authz server as well because we're hosting our own metadata.
-                authorization_servers: [`${process.env.PROXY_BASE_URL}/${tenantId}/mcp`],
+                authorization_servers: [`${process.env.PROXY_BASE_URL}/${tenantId}/${proxyPath}`],
                 
                 // OPTIONAL: Human-readable name for the resource
                 resource_name: `Okta AI Relay Protected Resource - ${tenantId}`,
-                
-                // OPTIONAL: Scopes supported by this protected resource
-                //scopes_supported: tenant.external_scopes || []
             }
 
             return res.status(200).json(metadata)

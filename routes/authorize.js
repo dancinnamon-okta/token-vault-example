@@ -2,7 +2,7 @@
 
 const crypto = require('crypto')
 const tenantConfig = require('../lib/tenant_config')
-const outboundRequestCache = require('../lib/outbound_request_cache')
+const oidcRequestCache = require('../lib/oidc_cache')
 
 //TODO: Basic updates to code comments.
 /**
@@ -51,18 +51,16 @@ module.exports.connect = function (app) {
             
             // Build new query parameters for the proxy authorize request
             let proxyQueryParams = new URLSearchParams()
-            proxyQueryParams.set("client_id", process.env.VSCODE_CLIENT)
+            proxyQueryParams.set("client_id", process.env.VSCODE_CLIENT) //TODO: Make this configurable!
             proxyQueryParams.set("redirect_uri", `${process.env.PROXY_BASE_URL}/callback`)
             proxyQueryParams.set("response_type", "code")
             proxyQueryParams.set("scope", "openid profile")
             proxyQueryParams.set("state", outboundState)
             proxyQueryParams.set("nonce", outboundNonce)
-            //proxyQueryParams.set("code_challenge", inboundAuthParameters.get("code_challenge"))
-            //proxyQueryParams.set("code_challenge_method", inboundAuthParameters.get("code_challenge_method"))
+            //TODO: Validate Nonce!
 
             // Cache the outbound authorize request using the outbound state as the key
-            //TODO: Need to add a nonce to the outbound cache so I can validate it on the callback.
-            outboundRequestCache.cacheOutboundRequest(outboundState, proxyQueryParams, inboundState, inboundAuthParameters, null, tenantId)
+            oidcRequestCache.cacheOidcRequest(outboundState, proxyQueryParams, inboundState, inboundAuthParameters, null, null, null, tenantId)
 
             const redirectUrl = `${authorizeEndpoint}?${proxyQueryParams.toString()}`
 
