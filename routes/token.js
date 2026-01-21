@@ -20,8 +20,6 @@ const returningAuthzCache = require('../lib/return_authz_cache')
  * @param {string} codeChallengeMethod - The method used (plain or S256)
  * @returns {boolean} - True if the verifier is valid, false otherwise
  */
-
-//TODO: The PKCE validation isn't working right now- need to fix it.
 function validatePKCE(codeVerifier, codeChallenge, codeChallengeMethod) {
     if (!codeVerifier || !codeChallenge) {
         return false
@@ -124,15 +122,14 @@ module.exports.connect = function (app) {
                 error_description: 'No code_challenge was found in the original authorization request.'
             })
         }
-        //TODO: I'm not currently validating PKCE!
-        /*
-                if (!validatePKCE(code_verifier, codeChallenge, codeChallengeMethod)) {
-                    return res.status(400).json({
-                        error: 'invalid_grant',
-                        error_description: 'The code_verifier does not match the code_challenge.'
-                    })
-                }
-        */
+
+        if (!validatePKCE(code_verifier, codeChallenge, codeChallengeMethod)) {
+            return res.status(400).json({
+                error: 'invalid_grant',
+                error_description: 'The code_verifier does not match the code_challenge.'
+            })
+        }
+
         // Validate client_id matches the original request
         let originalClientId = originalParameters.get('client_id')
     
