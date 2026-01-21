@@ -28,41 +28,43 @@ module.exports.connect = function (app) {
 
             // Build the authorization server metadata response per RFC 8414
             const metadata = {
-                // REQUIRED: The authorization server's issuer identifier
+                // The authorization server's issuer identifier
                 issuer: tenant.issuer,
                 
-                // REQUIRED: URL of the authorization endpoint
+                // URL of the authorization endpoint
                 //This will actually point to our internal proxy.
                 authorization_endpoint: `${process.env.PROXY_BASE_URL}/authorize/${tenantId}`,
                 
-                // REQUIRED: URL of the token endpoint
+                // URL of the token endpoint
+                //This will also point to our internal proxy.
                 token_endpoint: `${process.env.PROXY_BASE_URL}/token`,
                 
-                // OPTIONAL: URL of the JWK Set document
+                // URL of the JWK Set document
                 jwks_uri: tenant.keys_endpoint,
                 
                 // We're going to give them a local register endpoint that will return hard-coded data.
+                //See dyanmic_client_registration.js
                 registration_endpoint: `${process.env.PROXY_BASE_URL}/register`,
                 
-                // RECOMMENDED: JSON array of scopes supported
+                // JSON array of scopes supported
                 scopes_supported: tenant.external_scopes,
                 
-                // REQUIRED: JSON array of response types supported
+                // JSON array of response types supported
                 response_types_supported: ['code'],
                 
-                // OPTIONAL: JSON array of response modes supported
+                // JSON array of response modes supported
                 response_modes_supported: ['query'],
                 
-                // OPTIONAL: JSON array of grant types supported
+                // JSON array of grant types supported
                 grant_types_supported: ['authorization_code'],
                 
-                // OPTIONAL: JSON array of client authentication methods supported
+                // JSON array of client authentication methods supported
                 token_endpoint_auth_methods_supported: ['none', 'client_secret_basic', 'client_secret_post'],
                 
-                // OPTIONAL: JSON array of PKCE code challenge methods supported
+                // JSON array of PKCE code challenge methods supported (right now we're saying we REQUIRE PKCE as we should)
                 code_challenge_methods_supported: ['S256'],
                 
-                // OPTIONAL: URL of the protected resource metadata endpoint (RFC 9728)
+                // URL of the protected resource metadata endpoint (RFC 9728)
                 protected_resources: [`${process.env.PROXY_BASE_URL}/.well-known/oauth-protected-resource/${tenantId}/${proxyPath}`]
             }
             

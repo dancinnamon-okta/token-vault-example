@@ -5,6 +5,7 @@ const axios = require('axios')
 const sessionCache = require('../lib/connected_account_session_cache')
 const oidcRequestCache = require('../lib/oidc_cache')
 const returningAuthzCache = require("../lib/return_authz_cache")
+const tokenVault = require("../lib/token_vault")
 
 /**
  * Connected Account Callback Routes
@@ -14,6 +15,8 @@ const returningAuthzCache = require("../lib/return_authz_cache")
  * redirects them back to this callback endpoint with a connect_code.
  * 
  * @see https://auth0.com/docs/secure/call-apis-on-users-behalf/token-vault/connected-accounts-for-token-vault#complete-connected-accounts-request
+ * 
+ * Once the account has been connected in Auth0's token vault, we'll then redirect the user back to the final, original client.
  */
 
 /**
@@ -22,7 +25,7 @@ const returningAuthzCache = require("../lib/return_authz_cache")
 module.exports.connect = function (app) {
 
     /**
-     * GET /callback
+     * GET /connected_account_callback
      * 
      * Handles the callback from Auth0's Connected Accounts flow.
      * This endpoint receives the connect_code and state from Auth0 after
@@ -34,6 +37,8 @@ module.exports.connect = function (app) {
      * 
      * The state is used to retrieve the cached auth_session, which is then
      * used along with the connect_code to complete the Connected Accounts request.
+     * 
+     * Finally, the OIDC state is used to retrieve the original authorize request from the client- so we can redirect back to the original client.
      */
     app.get('/connected_account_callback', async (req, res) => {
         const { state, connect_code } = req.query
@@ -68,33 +73,11 @@ module.exports.connect = function (app) {
 
         const { authSession, userToken, oidcState } = cachedData
 
-        // Complete the Connected Accounts request by calling Auth0's complete endpoint
-        const completeUrl = `https://${process.env.AUTH0_DOMAIN}/me/v1/connected-accounts/complete`
-        const redirectUri = `${process.env.PROXY_BASE_URL}/connected_account_callback`
-        
         try {
-            const requestBody = {
-                auth_session: authSession,
-                connect_code: connect_code,
-                redirect_uri: redirectUri
-            }
-            //TODO: This really should be in a library like the rest of my endpoints do when they post to Okta or Auth0.
-            console.log('Completing Connected Accounts request:')
-            console.log(requestBody)
-            console.log(cachedData)
-            const response = await axios.post(completeUrl, requestBody, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${userToken}`
-                }
-            })
-
-            console.log('Connected Accounts complete response:')
-            console.log(response.data)
+            await tokenVault.completeConnectedAccountFlow(process.env.AUTH0_DOMAIN,process.env.PROXY_BASE_URL, authSession, userToken, connect_code)
 
             // Now that we're done with the account linking- return back to the original client and give them an authz code they can exchange for tokens.
-            //TODO: I'm always returning ID Token right now. Should i?
-            console.log("Returning details back to the originating redirect_uri.")
+            console.log("Connected accounts flow complete. Returning details back to the originating redirect_uri.")
 
             const oidcCachedData = oidcRequestCache.getOidcRequest(oidcState)
             oidcRequestCache.clearOidcRequest(oidcState)
@@ -104,7 +87,7 @@ module.exports.connect = function (app) {
             returningAuthzCache.addToCache(newAuthzCode, oidcCachedData.accessToken, oidcCachedData.accessTokenScope , oidcCachedData.accessTokenExpiresIn, oidcCachedData.idToken, oidcCachedData.originalState, oidcCachedData.tenantId, oidcCachedData.originalParameters)
             const finalRedirectUrl = `${oidcCachedData.originalParameters.get("redirect_uri")}?code=${newAuthzCode}&state=${oidcCachedData.originalState}`
 
-            res.redirect (finalRedirectUrl) //Redirect back to the original client with authz and original state.
+            res.redirect(finalRedirectUrl) //Redirect back to the original client with authz and original state.
         } catch (error) {
             console.error('Error completing Connected Accounts request:', error.response?.data || error.message)
 

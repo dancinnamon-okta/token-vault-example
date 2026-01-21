@@ -8,15 +8,15 @@ const tenantConfig = require('../lib/tenant_config')
  * 
  * This endpoint returns hard-coded client registration metadata
  * based on the tenant configuration.
+ * 
+ * Once complete, this endpoint will inspect the inbound /register call by the client, and it will perform a look-up on known, approved clients. It will then return those details.
+ * It is expected to use the inbound redirect_uri to determine which pre-registered information to pass back.
  */
-//This is really just meant for VSCode. Return a hard-coded client data.
 //TODO: Need to handle multiple public clients- not just VSCODE.
 module.exports.connect = function (app) {
 
     // RFC 7591 Dynamic Client Registration endpoint
     app.post('/register', async (req, res) => {
-
-        //TODO: Probably need to look at the body of the inbound request and identify if it's Vscode vs. something else.
         try {
             // Build the client registration response per RFC 7591
             const clientMetadata = {
@@ -50,7 +50,7 @@ module.exports.connect = function (app) {
                 client_name: `VSCode Proxy Client`,
                 
                 // Scopes the client is allowed to request
-                //TODO: Do I need this?
+                // I've found this to be derived from the authorization_server_metadata.
                 scope: []
             }
 

@@ -6,13 +6,15 @@ const tenantConfig = require('../lib/tenant_config')
 const vault = require('../lib/token_vault')
 const returningAuthzCache = require("../lib/return_authz_cache")
 
-//TODO: Mainly just updating comments and documentation.
 /**
  * OAuth 2.0 Callback Endpoint
  * 
  * This module handles the callback from the authorization server after
  * the user has authenticated. It validates the state parameter, exchanges
  * the authorization code for tokens, and processes the response.
+ * 
+ * It also will determine if the user has tokens vaulted in the Auth0 token vault or not. If not, it will begin the connected accounts flow with Auth0.
+ * If the user's tokens have been vaulted already, this endpoint will simply return a new authz code back to the client.
  */
 
 /**
@@ -86,6 +88,7 @@ module.exports.connect = function (app) {
 
             const idToken = await oktaAuth0Exchange.completeOktaOIDCLogin(tokenEndpoint, code, redirectUri, scope, process.env.VSCODE_CLIENT, process.env.VSCODE_SECRET)
             
+            //TODO: In the future, I'm expecting we can perform XAA directly against Auth0.
             console.log("ID Token Obtained.  Retrieving JAG for XAA using the agent ID...")
             const idJag = await oktaAuth0Exchange.getIdJagFromOkta(tokenEndpoint, tenant, idToken, process.env.AGENT_CLIENT_ID, process.env.AGENT_PRIVATE_KEY_PATH, process.env.AGENT_PRIVATE_KEY_ID)
 
@@ -101,7 +104,7 @@ module.exports.connect = function (app) {
             console.log(`Response from auth0: ${JSON.stringify(vaultedTokenResponse)}`)
 
             if (vaultedTokenResponse.success) {
-                //I think in this case, we just need to generate an authorization code, and return a response back to hte actual redirect URL. The authorization code would be a cache key for the agent access token.
+                //Our credentials are vaulted already-- return back to the client.
                 oidcRequestCache.clearOidcRequest(state)
                 console.log("Cached credentials already exist. Connected accounts flow is not necessary. Returning details back to the originating redirect_uri.")
                 const newAuthzCode = crypto.randomBytes(32).toString('base64url')
@@ -109,9 +112,8 @@ module.exports.connect = function (app) {
                 const finalRedirectUrl = `${originalParameters.get("redirect_uri")}?code=${newAuthzCode}&state=${originalState}`
                 res.redirect (finalRedirectUrl) //Redirect back to the original client with authz and original state.
             }
-            else if(vaultedTokenResponse.needsLinking) { //We failed due to lack of credentials
+            else if(vaultedTokenResponse.needsLinking) { //We failed due to lack of credentials. Begin the account linking flow.
                 console.log("Account linking is required. Beginning the account linking flow.")
-                console.log(cachedRequest)
                 const connectedAccountResponse = await vault.beginConnectedAccountFlow(process.env.AUTH0_DOMAIN, agentAccessToken, process.env.AUTH0_CTE_CLIENT_ID, process.env.AUTH0_CTE_CLIENT_SECRET, state, tenant.vault_connection, `${process.env.PROXY_BASE_URL}/connected_account_callback`, tenant.external_scopes)
                 
                 if(connectedAccountResponse.success) {

@@ -4,22 +4,24 @@ const crypto = require('crypto')
 const tenantConfig = require('../lib/tenant_config')
 const oidcRequestCache = require('../lib/oidc_cache')
 
-//TODO: Basic updates to code comments.
 /**
  * OAuth 2.0 Authorize Endpoint Proxy
  * 
  * This module provides a proxy authorize endpoint that redirects to the
- * real authorization server's /authorize endpoint. It acts as a pass-through,
- * forwarding all query parameters to the upstream authorization server.
+ * real authorization server's /authorize endpoint.
+ * 
+ * When this endpoint is invoked, it caches off the original inbound request, and begins a brand new /authorize request with the IDP.
+ * During this request's callback, (as defined in oidc_callback.js), we have the ability to ensure the user's credentials are vaulted.
+ * If account linking is required, we're still in the browser, so we'll begin (and complete) that flow while the user's browser is still active.
+ * Flow if account linking is required: authorize.js -> oidc_callback.js -> vault for account linking -> connected_accounts_callback.js -> client.
+ * Flow is account linking is NOT required: authorize.js -> oidc_callback.js -> client.
  */
 module.exports.connect = function (app) {
 
     /**
      * GET /authorize/:tenantId
      * 
-     * Redirects to the real OAuth 2.0 authorization endpoint for the specified tenant.
-     * All query parameters (client_id, redirect_uri, scope, state, etc.) are forwarded
-     * to the upstream authorization server.
+     * Caches off the inbound reqeust and Redirects to the real OAuth 2.0 authorization endpoint for the specified tenant. 
      * 
      * @param {string} tenantId - The tenant identifier from the URL path
      * @returns {302} Redirect to the real authorization endpoint
@@ -37,9 +39,10 @@ module.exports.connect = function (app) {
                 })
             }
             console.log("Found a valid tenant...")
-            // Cache the inbound OAuth2 request - state parameter from req.query is used as key.
+            // Cache the inbound OAuth2 request - OIDC state parameter is used as key.
             const inboundAuthParameters = new URLSearchParams(req.query)
             const inboundState = inboundAuthParameters.get('state')
+            const inboundClientId = inboundAuthParameters.get('client_id')
 
             // Build a new authorize request using the proxy client
             const authorizeEndpoint = `${process.env.OKTA_DOMAIN}/oauth2/v1/authorize`
@@ -51,13 +54,12 @@ module.exports.connect = function (app) {
             
             // Build new query parameters for the proxy authorize request
             let proxyQueryParams = new URLSearchParams()
-            proxyQueryParams.set("client_id", process.env.VSCODE_CLIENT) //TODO: Make this configurable!
+            proxyQueryParams.set("client_id", inboundClientId)
             proxyQueryParams.set("redirect_uri", `${process.env.PROXY_BASE_URL}/callback`)
             proxyQueryParams.set("response_type", "code")
             proxyQueryParams.set("scope", "openid profile")
             proxyQueryParams.set("state", outboundState)
             proxyQueryParams.set("nonce", outboundNonce)
-            //TODO: Validate Nonce!
 
             // Cache the outbound authorize request using the outbound state as the key
             oidcRequestCache.cacheOidcRequest(outboundState, proxyQueryParams, inboundState, inboundAuthParameters, null, null, null, tenantId)

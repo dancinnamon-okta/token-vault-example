@@ -7,8 +7,10 @@ const returningAuthzCache = require('../lib/return_authz_cache')
  * OAuth 2.0 Token Endpoint
  * 
  * This module provides a token endpoint that exchanges authorization codes
- * for access tokens. It validates the authorization code against the cache
+ * for id and access tokens. It validates the authorization code against the cache
  * and performs PKCE validation before returning the token.
+ * 
+ * It should be noted that we've already performed XAA and obtained our agent token- so we dont actually need to talk to the authz server here, but instead return our data.
  */
 
 /**
@@ -25,15 +27,12 @@ function validatePKCE(codeVerifier, codeChallenge, codeChallengeMethod) {
         return false
     }
 
-    if (codeChallengeMethod === 'S256') {
-        // SHA256 hash the verifier and base64url encode it
-        const hash = crypto.createHash('sha256')
-            .update(codeVerifier)
-            .digest('base64url')
-        return hash === codeChallenge
+    if (codeChallengeMethod != 'S256') {
+        throw new Error("Only S256 PKCE challenge method is supported.")
     }
 
-    return false
+    const hash = crypto.createHash('sha256').update(codeVerifier).digest('base64url')
+    return hash === codeChallenge
 }
 
 /**
@@ -53,6 +52,7 @@ module.exports.connect = function (app) {
      * - client_id: The client identifier
      * - code_verifier: The PKCE code verifier
      * 
+     * Note: This mechanism is primarily designed to deal with public clients - so no client authentication is happening here.
      * @returns {Object} Token response with access_token
      */
     app.post('/token', async (req, res) => {
@@ -87,7 +87,7 @@ module.exports.connect = function (app) {
         if (!code_verifier) {
             return res.status(400).json({
                 error: 'invalid_request',
-                error_description: 'The code_verifier parameter is required for PKCE.'
+                error_description: 'The code_verifier parameter is required.'
             })
         }
 
@@ -143,17 +143,13 @@ module.exports.connect = function (app) {
             })
         }
 
-        // Return the access token
-        const accessToken = cachedAuthz.accessToken
-        const idToken = cachedAuthz.idToken
-
         console.log(`Token endpoint: Successfully exchanged authorization code for access token for tenant ${cachedAuthz.tenantId}`)
 
         res.header('Cache-Control', 'no-store');
 
         const response = {
-            access_token: accessToken,
-            id_token: idToken,
+            access_token: cachedAuthz.accessToken,
+            id_token: cachedAuthz.idToken,
             scope: cachedAuthz.scope,
             expires_in: cachedAuthz.expires,
             token_type: 'Bearer'

@@ -9,7 +9,6 @@ const tenantConfig = require('../lib/tenant_config')
  * This endpoint advertises metadata about the protected resource,
  * including which authorization servers can be used to obtain access tokens.
  */
-//TODO: I'm hard coding MCP endpoint in there. Should I??
 module.exports.connect = function (app) {
 
     // RFC 9728 Protected Resource Metadata endpoint

@@ -7,7 +7,6 @@ const vault = require('../lib/token_vault')
  * Connects proxy routes to the Express app.
  * All requests to /:tenantId/proxy/* are forwarded to the tenant's backend URL.
  */
-//TODO: There's a potential that we might not use a vaulted connection at all. Test this!
 module.exports.connect = function (app, tenantMiddleware, authMiddleware) {
 
     // Catch-all proxy route
@@ -32,24 +31,12 @@ module.exports.connect = function (app, tenantMiddleware, authMiddleware) {
                 vaultedToken = vaultedTokenResponse.accessToken
             }
             else if(vaultedTokenResponse.needsLinking) { //We failed due to lack of credentials
-                console.log("Account linking is required. Beginning the account linking flow.")
+                console.log("Account linking is required. Return a 401, with instructions on what to do.")
 
-                const connectedAccountResponse = await vault.beginConnectedAccountFlow(process.env.AUTH0_DOMAIN, req.authContext.accessToken, process.env.AUTH0_CTE_CLIENT_ID, process.env.AUTH0_CTE_CLIENT_SECRET, tenantConfig.vault_connection, `${process.env.PROXY_BASE_URL}/callback`, tenantConfig.external_scopes)
-                if(connectedAccountResponse.success) {
-                    //In a real implementation, you'd want to persist the authSession and associate it with the user's session.
-                    return res.status(401).json({
+                return res.status(401).json({
                         error: 'Account Linking Required',
-                        message: 'A connected account linking is required to obtain tokens for the backend service.',
-                        connectUrl: connectedAccountResponse.connectUrl,
-                        authSession: connectedAccountResponse.authSession
+                        message: 'A connected account linking is required to obtain tokens for the backend service. Please re-log in.',
                     })
-                }
-                else {
-                    return res.status(403).json({
-                        error: 'Token Request Failed',
-                        message: 'Unable to obtain proper tokens.'
-                    })
-                }
             }
             else { //We straight up failed.
                 return res.status(403).json({
